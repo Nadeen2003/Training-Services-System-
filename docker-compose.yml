@@ -1,0 +1,147 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  mysql_course:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: course_service
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  mysql_registration:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: registration_service
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3308:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  mysql_attendance:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: attendance_service
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3309:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  mysql_certification:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: certification_service
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3310:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  service-registry:
+    build: ./service-registry
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+  gateway:
+    build: ./gateway
+    restart: unless-stopped
+    depends_on:
+      - service-registry
+    ports:
+      - "19020:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://service-registry:8761/eureka/
+
+  course-service:
+    build: ./course-service
+    restart: unless-stopped
+    depends_on:
+      mysql_course:
+        condition: service_healthy
+      service-registry:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql_course:3306/course_service?serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://service-registry:8761/eureka/
+
+  registration-service:
+    build: ./registration-service
+    restart: unless-stopped
+    depends_on:
+      mysql_registration:
+        condition: service_healthy
+      service-registry:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql_registration:3306/registration_service?serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://service-registry:8761/eureka/
+      SPRING_RABBITMQ_HOST: rabbitmq
+
+  attendance-service:
+    build: ./attendance-service
+    restart: unless-stopped
+    depends_on:
+      mysql_attendance:
+        condition: service_healthy
+      service-registry:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql_attendance:3306/attendance_service?serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://service-registry:8761/eureka/
+      SPRING_RABBITMQ_HOST: rabbitmq
+
+  certification-service:
+    build: ./certification-service
+    restart: unless-stopped
+    depends_on:
+      mysql_certification:
+        condition: service_healthy
+      service-registry:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql_certification:3306/certification_service?serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://service-registry:8761/eureka/
+      SPRING_RABBITMQ_HOST: rabbitmq
